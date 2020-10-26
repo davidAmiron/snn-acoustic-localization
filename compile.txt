@@ -1,0 +1,1 @@
+gcc -c -fPIC model_IHC_BEZ2018.c -o model_IHC_BEZ2018.o
