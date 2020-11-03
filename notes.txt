@@ -1,0 +1,5 @@
+bindsnet exists in this folder, but is gitignored. It is simlinked the following way:
+find a location in the python path by running print(sys.path)
+cd to a location
+run something like the following:
+ln -s /Users/davidmiron/dev/ECE_590_07/snn-acoustic-localization/bindsnet/bindsnet bindsnet

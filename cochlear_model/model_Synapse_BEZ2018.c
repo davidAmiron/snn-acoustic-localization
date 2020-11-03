@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <mex.h>
+//#include <mex.h>
 #include <time.h>
 
 #include "complex.hpp"
@@ -41,116 +41,225 @@
 
 /* This function is the MEX "wrapper", to pass the input and output variables between the .mex* file and Matlab or Octave */
 
-void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
-{
+// void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+// {
     
-    double *px, cf, tdres, tabs, trel, noiseType, implnt, spont;
-    int    nrep, pxbins, lp, totalstim;
-    mwSize  outsize[2];
+//     double *px, cf, tdres, tabs, trel, noiseType, implnt, spont;
+//     int    nrep, pxbins, lp, totalstim;
+//     mwSize  outsize[2];
+    
+//     double *pxtmp, *cftmp, *nreptmp, *tdrestmp, *noiseTypetmp, *implnttmp, *sponttmp, *tabstmp, *treltmp;
+    
+//     double *meanrate, *varrate, *psth, *synout, *trd_vector, *trel_vector;
+    
+//     void SingleAN(double *, double, int, double, int, double, double, double, double, double, double *, double *, double *, double *, double *, double *);
+    
+//     /* Check for proper number of arguments */
+    
+//     if (nrhs != 9)
+//     {
+//         mexErrMsgTxt("model_Synapse requires 9 input arguments.");
+//     };
+    
+//     if (nlhs > 6)
+//     {
+//         mexErrMsgTxt("model_Synapse has a maximum of 6 output argument.");
+//     };
+    
+//     /* Assign pointers to the inputs */
+    
+//     pxtmp		 = mxGetPr(prhs[0]);
+//     cftmp		 = mxGetPr(prhs[1]);
+//     nreptmp		 = mxGetPr(prhs[2]);
+//     tdrestmp	 = mxGetPr(prhs[3]);
+//     noiseTypetmp = mxGetPr(prhs[4]);
+//     implnttmp	 = mxGetPr(prhs[5]);
+//     sponttmp	 = mxGetPr(prhs[6]);
+//     tabstmp      = mxGetPr(prhs[7]);
+//     treltmp      = mxGetPr(prhs[8]);
+
+//     /* Check individual input arguments */
+    
+//     spont = sponttmp[0];
+//     if ((spont<1e-4)||(spont>180))
+//         mexErrMsgTxt("spont must in the range [1e-4,180]\n");   
+    
+//     pxbins = (int)mxGetN(prhs[0]);
+//     if (pxbins==1)
+//         mexErrMsgTxt("px must be a row vector\n");
+    
+//     cf = cftmp[0];
+    
+//     nrep = (int)nreptmp[0];
+//     if (nreptmp[0]!=nrep)
+//         mexErrMsgTxt("nrep must an integer.\n");
+//     if (nrep<1)
+//         mexErrMsgTxt("nrep must be greater that 0.\n");
+    
+//     tdres = tdrestmp[0];
+    
+//     noiseType  = noiseTypetmp[0];   fixed or variable fGn 
+    
+//     implnt = implnttmp[0];  /* actual/approximate implementation of the power-law functions */
+    
+//     tabs = tabstmp[0];  /* absolute refractory period */
+//     if ((tabs<0)||(tabs>20e-3))
+//         mexErrMsgTxt("tabs must in the range [0,20e-3]\n");
+    
+//     trel = treltmp[0];  /* baseline relative refractory period */
+//     if ((trel<0)||(trel>20e-3))
+//         mexErrMsgTxt("trel must in the range [0,20e-3]\n");
+    
+//     /* Calculate number of samples for total repetition time */
+    
+//     totalstim = (int)floor(pxbins/nrep);
+    
+//     px = (double*)mxCalloc(totalstim*nrep,sizeof(double));
+    
+//     /* Put stimulus waveform into pressure waveform */
+    
+//     for (lp=0; lp<pxbins; lp++)
+//         px[lp] = pxtmp[lp];
+    
+//     /* Create arrays for the return arguments */
+    
+//     outsize[0] = 1;
+//     outsize[1] = totalstim;
+    
+//     plhs[0] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+//     plhs[1] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+//     plhs[2] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    
+//     outsize[1] = totalstim*nrep;
+//     plhs[3] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    
+//     plhs[4] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+//     plhs[5] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    
+//     /* Assign pointers to the outputs */
+    
+//     psth	  = mxGetPr(plhs[0]);
+//     meanrate	  = mxGetPr(plhs[1]);
+//     varrate = mxGetPr(plhs[2]);
+//     synout = mxGetPr(plhs[3]);
+//     trd_vector = mxGetPr(plhs[4]);
+//     trel_vector = mxGetPr(plhs[5]);
+    
+//     /* run the model */
+        
+//     SingleAN(px,cf,nrep,tdres,totalstim,noiseType,implnt,spont,tabs,trel,meanrate,varrate,psth,synout,trd_vector,trel_vector);
+    
+//     mxFree(px);
+    
+// }
+
+void wrapper_Synapse(double *vihc, double pxlen, double cf, int nrep, double dt, double noiseType,
+             double implnt, double spont, double tabs, double trel, double *psth) {
+
+    double *px, tdres;
+    int    pxbins, lp, totalstim;
+    //mwSize  outsize[2];
     
     double *pxtmp, *cftmp, *nreptmp, *tdrestmp, *noiseTypetmp, *implnttmp, *sponttmp, *tabstmp, *treltmp;
     
-    double *meanrate, *varrate, *psth, *synout, *trd_vector, *trel_vector;
+    double *meanrate, *varrate, *synout, *trd_vector, *trel_vector;
     
     void SingleAN(double *, double, int, double, int, double, double, double, double, double, double *, double *, double *, double *, double *, double *);
     
     /* Check for proper number of arguments */
     
-    if (nrhs != 9)
-    {
-        mexErrMsgTxt("model_Synapse requires 9 input arguments.");
-    };
-    
-    if (nlhs > 6)
-    {
-        mexErrMsgTxt("model_Synapse has a maximum of 6 output argument.");
-    };
     
     /* Assign pointers to the inputs */
     
-    pxtmp		 = mxGetPr(prhs[0]);
-    cftmp		 = mxGetPr(prhs[1]);
-    nreptmp		 = mxGetPr(prhs[2]);
-    tdrestmp	 = mxGetPr(prhs[3]);
-    noiseTypetmp = mxGetPr(prhs[4]);
-    implnttmp	 = mxGetPr(prhs[5]);
-    sponttmp	 = mxGetPr(prhs[6]);
-    tabstmp      = mxGetPr(prhs[7]);
-    treltmp      = mxGetPr(prhs[8]);
+    // pxtmp        = mxGetPr(prhs[0]);
+    // cftmp        = mxGetPr(prhs[1]);
+    // nreptmp      = mxGetPr(prhs[2]);
+    // tdrestmp     = mxGetPr(prhs[3]);
+    // noiseTypetmp = mxGetPr(prhs[4]);
+    // implnttmp    = mxGetPr(prhs[5]);
+    // sponttmp     = mxGetPr(prhs[6]);
+    // tabstmp      = mxGetPr(prhs[7]);
+    // treltmp      = mxGetPr(prhs[8]);
 
     /* Check individual input arguments */
     
-    spont = sponttmp[0];
     if ((spont<1e-4)||(spont>180))
-        mexErrMsgTxt("spont must in the range [1e-4,180]\n");   
+        printf("spont must in the range [1e-4,180]\n");   
     
-    pxbins = (int)mxGetN(prhs[0]);
+    pxbins = pxlen; // pxbins is the length of vihc
     if (pxbins==1)
-        mexErrMsgTxt("px must be a row vector\n");
-    
-    cf = cftmp[0];
-    
-    nrep = (int)nreptmp[0];
-    if (nreptmp[0]!=nrep)
-        mexErrMsgTxt("nrep must an integer.\n");
+        printf("px must be a row vector\n");
+        
     if (nrep<1)
-        mexErrMsgTxt("nrep must be greater that 0.\n");
+        printf("nrep must be greater that 0.\n");
+        
+    // noiseType  = noiseTypetmp[0];  /* fixed or variable fGn */
     
-    tdres = tdrestmp[0];
+    // implnt = implnttmp[0];  /* actual/approximate implementation of the power-law functions */
     
-    noiseType  = noiseTypetmp[0];  /* fixed or variable fGn */
-    
-    implnt = implnttmp[0];  /* actual/approximate implementation of the power-law functions */
-    
-    tabs = tabstmp[0];  /* absolute refractory period */
+    // tabs = tabstmp[0];  /* absolute refractory period */
     if ((tabs<0)||(tabs>20e-3))
-        mexErrMsgTxt("tabs must in the range [0,20e-3]\n");
+        printf("tabs must in the range [0,20e-3]\n");
     
-    trel = treltmp[0];  /* baseline relative refractory period */
+    // trel = treltmp[0];  /* baseline relative refractory period */
     if ((trel<0)||(trel>20e-3))
-        mexErrMsgTxt("trel must in the range [0,20e-3]\n");
+        printf("trel must in the range [0,20e-3]\n");
     
     /* Calculate number of samples for total repetition time */
     
     totalstim = (int)floor(pxbins/nrep);
     
-    px = (double*)mxCalloc(totalstim*nrep,sizeof(double));
+    px = (double*)malloc(totalstim*nrep*sizeof(double));
     
     /* Put stimulus waveform into pressure waveform */
     
     for (lp=0; lp<pxbins; lp++)
-        px[lp] = pxtmp[lp];
+        px[lp] = vihc[lp];
     
     /* Create arrays for the return arguments */
     
-    outsize[0] = 1;
-    outsize[1] = totalstim;
+    // outsize[0] = 1;
+    // outsize[1] = totalstim;
     
-    plhs[0] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
-    plhs[1] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
-    plhs[2] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // plhs[0] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // plhs[1] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // plhs[2] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
     
-    outsize[1] = totalstim*nrep;
-    plhs[3] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // outsize[1] = totalstim*nrep;
+    // plhs[3] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
     
-    plhs[4] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
-    plhs[5] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // plhs[4] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
+    // plhs[5] = mxCreateNumericArray(2, outsize, mxDOUBLE_CLASS, mxREAL);
     
     /* Assign pointers to the outputs */
     
-    psth	  = mxGetPr(plhs[0]);
-    meanrate	  = mxGetPr(plhs[1]);
-    varrate = mxGetPr(plhs[2]);
-    synout = mxGetPr(plhs[3]);
-    trd_vector = mxGetPr(plhs[4]);
-    trel_vector = mxGetPr(plhs[5]);
+    // psth      = mxGetPr(plhs[0]);
+    // meanrate      = mxGetPr(plhs[1]);
+    // varrate = mxGetPr(plhs[2]);
+    // synout = mxGetPr(plhs[3]);
+    // trd_vector = mxGetPr(plhs[4]);
+    // trel_vector = mxGetPr(plhs[5]);
+
+    //psth = malloc(totalstim*sizeof(double));
+
+    // Mallocing these here so the program works. If want to get these from python,
+    // need to allocate them in python and pass them in.
+    meanrate = malloc(totalstim*sizeof(double));
+    varrate = malloc(totalstim*sizeof(double));
+    synout = malloc(totalstim*nrep*sizeof(double));
+    trd_vector = malloc(totalstim*nrep*sizeof(double));
+    trel_vector = malloc(totalstim*nrep*sizeof(double));
     
     /* run the model */
         
     SingleAN(px,cf,nrep,tdres,totalstim,noiseType,implnt,spont,tabs,trel,meanrate,varrate,psth,synout,trd_vector,trel_vector);
     
-    mxFree(px);
-    
+    free(px);
+    free(meanrate);
+    free(varrate);
+    free(synout);
+    free(trd_vector);
+    free(trel_vector);
 }
 
 void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, double noiseType, double implnt, double spont, double tabs, double trel, double *meanrate, double *varrate, double *psth, double *synout, double *trd_vector, double *trel_vector)
@@ -191,18 +300,18 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
     
     
     /* We register only the spikes at times after zero, the sufficient array size (more than 99.7% of cases) to register spike times  after zero is :/
-     * /*MaxN=signalLengthInSec/meanISI+ 3*sqrt(signalLengthInSec/MeanISI)= nSpike_average +3*sqrt(nSpike_average)*/
+     * MaxN=signalLengthInSec/meanISI+ 3*sqrt(signalLengthInSec/MeanISI)= nSpike_average +3*sqrt(nSpike_average)*/
     MeanISI = (1/total_mean_rate)+ (t_rd_init)/nSites+tabs+trel;
     SignalLength = totalstim*nrep*tdres;
     MaxArraySizeSpikes= ceil ((long) (SignalLength/MeanISI + 3* sqrt(SignalLength/MeanISI)));
     
-    sptime  = (double*)mxCalloc(MaxArraySizeSpikes,sizeof(double));
+    sptime  = (double*)malloc(MaxArraySizeSpikes*sizeof(double));
     nspikes=0;
     do {
         if  (nspikes<0) /* Deal with cases where the spike time array was not long enough */
-        {   mxFree(sptime);
+        {   free(sptime);
             MaxArraySizeSpikes = MaxArraySizeSpikes+100; /* Make the spike time array 100 elements larger */
-            sptime  = (double*)mxCalloc(MaxArraySizeSpikes,sizeof(double));
+            sptime  = (double*)malloc(MaxArraySizeSpikes*sizeof(double));
         }
         
         nspikes =  SpikeGenerator(synout,  tdres, t_rd_rest, t_rd_init, tau, t_rd_jump, nSites, tabs, trel, spont, totalstim, nrep,  total_mean_rate,MaxArraySizeSpikes,  sptime, trd_vector) ;
@@ -232,6 +341,8 @@ void SingleAN(double *px, double cf, int nrep, double tdres, int totalstim, doub
         ipst = (int) (fmod(sptime[i],tdres*totalstim) / tdres);
         psth[ipst] = psth[ipst] + 1;
     };
+
+    free(sptime);
         
 } /* End of the SingleAN function */
 
@@ -258,22 +369,22 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     mxArray	*IhcInputArray[3], *IhcOutputArray[1];
     double *sampIHC, *ihcDims;
     
-    mappingOut = (double*)mxCalloc((long) ceil(totalstim*nrep),sizeof(double));
-    powerLawIn = (double*)mxCalloc((long) ceil(totalstim*nrep+3*delaypoint),sizeof(double));
-    sout1 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    sout2 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    synSampOut  = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    TmpSyn  = (double*)mxCalloc((long) ceil(totalstim*nrep+2*delaypoint),sizeof(double));
+    mappingOut = (double*)malloc(((long) ceil(totalstim*nrep))*sizeof(double));
+    powerLawIn = (double*)malloc(((long) ceil(totalstim*nrep+3*delaypoint))*sizeof(double));
+    sout1 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    sout2 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    synSampOut  = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    TmpSyn  = (double*)malloc(((long) ceil(totalstim*nrep+2*delaypoint))*sizeof(double));
     
-    m1 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    m2 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    m3  = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    m4 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    m5  = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
+    m1 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    m2 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    m3  = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    m4 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    m5  = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
     
-    n1 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    n2 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
-    n3 = (double*)mxCalloc((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq),sizeof(double));
+    n1 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    n2 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
+    n3 = (double*)malloc(((long) ceil((totalstim*nrep+2*delaypoint)*tdres*sampFreq))*sizeof(double));
     
     /*----------------------------------------------------------*/
     /*------- Parameters of the Power-law function -------------*/
@@ -334,7 +445,7 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     mexCallMATLAB(1, IhcOutputArray, 3, IhcInputArray, "resample");
     sampIHC = mxGetPr(IhcOutputArray[0]);
     
-    mxFree(powerLawIn); mxFree(mappingOut);
+    free(powerLawIn); free(mappingOut);
     /*----------------------------------------------------------*/
     /*----- Running Power-law Adaptation -----------------------*/
     /*----------------------------------------------------------*/
@@ -403,8 +514,8 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
         synSampOut[k] = sout1[k] + sout2[k];
         k = k+1;
     }   /* end of all samples */
-    mxFree(sout1); mxFree(sout2);
-    mxFree(m1); mxFree(m2); mxFree(m3); mxFree(m4); mxFree(m5); mxFree(n1); mxFree(n2); mxFree(n3);
+    free(sout1); free(sout2);
+    free(m1); free(m2); free(m3); free(m4); free(m5); free(n1); free(n2); free(n3);
     /*----------------------------------------------------------*/
     /*----- Upsampling to original (High 100 kHz) sampling rate --------*/
     /*----------------------------------------------------------*/
@@ -419,7 +530,7 @@ double Synapse(double *ihcout, double tdres, double cf, int totalstim, int nrep,
     for (i=0;i<totalstim*nrep;++i)
         synout[i] = TmpSyn[i+delaypoint];
     
-    mxFree(synSampOut); mxFree(TmpSyn);
+    free(synSampOut); free(TmpSyn);
     mxDestroyArray(randInputArray[0]); mxDestroyArray(randOutputArray[0]);
     mxDestroyArray(IhcInputArray[0]); mxDestroyArray(IhcOutputArray[0]); mxDestroyArray(IhcInputArray[1]); mxDestroyArray(IhcInputArray[2]);
     mxDestroyArray(randInputArray[1]);mxDestroyArray(randInputArray[2]); mxDestroyArray(randInputArray[3]);

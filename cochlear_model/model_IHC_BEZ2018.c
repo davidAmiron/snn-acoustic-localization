@@ -165,7 +165,7 @@
 
 // }
 
-void wrapper(double *pin, int pinlen, double cf, int nrep, double dt, double reptime, int cohc, int cihc, int species, double *ihcout)
+void wrapper_IHCAN(double *pin, int pinlen, double cf, int nrep, double dt, double reptime, int cohc, int cihc, int species, double *ihcout)
 {
   
   double *px;
@@ -255,7 +255,7 @@ void wrapper(double *pin, int pinlen, double cf, int nrep, double dt, double rep
 
   IHCAN(px,cf,nrep,tdres,totalstim,cohc,cihc,species,ihcout);
 
- //mxFree(px);
+  free(px);
 
 }
 

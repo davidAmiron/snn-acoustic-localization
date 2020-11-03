@@ -7,6 +7,7 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import ctypes as ct
 import pathlib
+import matlab.engine
 
 class RFNodes(Nodes):
     """
@@ -89,14 +90,12 @@ class RFNodes(Nodes):
 
         super().forward(x)
 
-def get_audio_data():
-    # Create dummy signal
-    max_t = 2           # Max time
-    fs = 44100          # Sampling frequency
-    freq = 440          # Desired frequency
+def get_audio_data(fs=100e3, max_t=1):
+    # Create dummy signal with max time max_t and sampling frequency fs
+    freq = 440          # Desired frequency, set to 110 because it is close to human voice
     t = np.arange(0, max_t, 1/fs)   # Time period
     signal = np.sin(2*np.pi*freq*t)
-    return signal, fs, max_t
+    return signal
 
 def play_signal(signal, fs):
     signal = signal * (2**15 - 1) / np.max(np.abs(signal))
@@ -110,7 +109,7 @@ def signal_HRTF_transform(signal, azn, eln):
        Take in a signal, azimuthal index, and elevation index, and return
        the signal convolved with the HRIRs for subject 040
     """
-    hrir_data = loadmat('/Users/davidmiron/Downloads/CIPIC_hrtf_database/standard_hrir_database/subject_040/hrir_final.mat')
+    hrir_data = loadmat('/Users/davidmiron/Documents/neuromorphic_computing/CIPIC_hrtf_database/standard_hrir_database/subject_040/hrir_final.mat')
     hrir_l = hrir_data['hrir_l']
     hrir_r = hrir_data['hrir_r']
 
@@ -123,7 +122,7 @@ def signal_HRTF_transform(signal, azn, eln):
     return signal_left, signal_right
 
 
-def cochlear_model(signal_raw, fs, max_t):
+"""def cochlear_model(signal_raw, fs, max_t):
     # Get the model
     libname = pathlib.Path().absolute() / "cochlear_model/libcochlea.so"
     lib_cochlea = ct.CDLL(libname)
@@ -148,9 +147,10 @@ def cochlear_model(signal_raw, fs, max_t):
     ihc_len = int(np.floor(reptime/dt+0.5)) * nrep
     ihc_python = [1] * ihc_len
     v_ihcout = (ct.c_double * ihc_len)(*ihc_python)
-    print(v_ihcout[200])
-    lib_cochlea.wrapper(v_pin, v_pinlen, v_CF, v_nrep, v_dt, v_reptime, v_coch, v_cich, v_species, v_ihcout)
-    print(v_ihcout[200])
+    lib_cochlea.wrapper_IHCAN(v_pin, v_pinlen, v_CF, v_nrep, v_dt, v_reptime, v_coch, v_cich, v_species, v_ihcout)
+
+    psth_len = int(np.floor(ihc_len/nrep))
+
     plt.ioff()
     plt.plot(v_ihcout)
     plt.show()
@@ -163,11 +163,62 @@ def cochlear_model(signal_raw, fs, max_t):
 #    c_float_init = ct.c_float * 2
 #    arr = c_float_init(7.2, 3.9)
 #    print(lib_cochlea.testfun(ct.c_float(5), arr))
-#    print('arr:', arr[0], arr[1])
+#    print('arr:', arr[0], arr[1])"""
+
+def cochlear_model(signal_raw, fs, max_t):
+    eng = matlab.engine.start_matlab()
+    eng.addpath('/Users/davidmiron/Documents/neuromorphic_computing/UR_EAR_2020b')
+
+    # Get IHC voltage
+    signal = signal_raw.tolist()
+    v_pin = matlab.double(signal_raw.tolist())
+    v_cf = float(1e3)               # characteristic frequency of fiber (Hz)
+    v_nrep = float(1)
+    v_dt = float(1/fs)
+    v_reptime = float(max_t+0.01)
+    v_coch = float(1)               # OHC scaling factor: 1 for normal, 0 for complete dysfunction
+    v_cich = float(1)               # IHC scaling factor: 1 for normal, 0 for complete dysfunction
+    v_species = float(2)            # model species: 1 for cat, 2 for human with BM Shera et al., 3 for human with BM tuning from Clasberg & Moore
+    vihc = eng.model_IHC_BEZ2018(v_pin, v_cf, v_nrep, v_dt, v_reptime, v_coch, v_cich, v_species)
+    vihc = np.asarray(vihc[0])
+    #vihc.fill(0)
+
+    # Get spike train
+    s_vihc = matlab.double(vihc.tolist())
+    s_cf = v_cf
+    s_nrep = v_nrep
+    s_dt = v_dt
+    print('SPIKE DT {}'.format(s_dt))
+    s_noiseType = float(1)
+    s_implnt = float(1)
+    s_spont = float(50)
+    s_tabs = float(0.007e-3)
+    s_trel = float(0.006e-3)
+
+    psth = eng.model_Synapse_BEZ2018(s_vihc, s_cf, s_nrep, s_dt, s_noiseType, s_implnt, s_spont, s_tabs, s_trel)
+    psth = np.asarray(psth[0])
+    #plt.ioff()
+    #plt.plot(vihc)
+    #plt.show()
+    #eng.quit()
+    return psth
+
+"""def get_spike_data():
+    # For now just return one spike data while I get the rest of the network running
+    return loadmat('spike_data/psth3.mat')['psth'][0]"""
+
+
 
 
 if __name__ == '__main__':
-    cochlear_model(*get_audio_data())
+    psth = cochlear_model(*get_audio_data())
+    #psth = get_spike_data()
+    print(psth)
+    print(type(psth))
+    plt.ioff()
+    plt.plot(psth)
+    plt.show()
+
 
     """tone, sampling_freq = get_audio_data()
     tone_left, tone_right = signal_HRTF_transform(tone, 8, 1)
