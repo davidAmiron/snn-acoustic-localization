@@ -3,6 +3,7 @@ from bindsnet.network import Network
 from bindsnet.network.nodes import Input, LIFNodes, IFNodes
 from bindsnet.network.topology import Connection
 from bindsnet.network.monitors import Monitor
+from bindsnet.learning import PostPre
 from typing import Union, Optional, Iterable
 import torch
 import numpy as np
@@ -380,7 +381,125 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     network_classify.add_monitor(monitor=mon_rfs_left, name='rfs_left')
     monitors['rfs_left'] = mon_rfs_left
 
+    # Add teacher nodes
+    l_teacher_right = Input(n=num_rfs_right, traces=True)
+    l_teacher_left = Input(n=num_rfs_left, traces=True)
+    network_classify.add_layer(layer=l_teacher_right, name='teacher_right')
+    network_classify.add_layer(layer=l_teacher_left, name='teacher_left')
+
+    # Add output nodes
+    l_output_right = LIFNodes(n=num_rfs_right, traces=True)
+    l_output_left = LIFNodes(n=num_rfs_left, traces=True)
+    network_classify.add_layer(layer=l_output_right, name='output_right')
+    network_classify.add_layer(layer=l_output_left, name='output_left')
+
+    # Add connections to output nodes
+    c_rfsright_outputright = Connection(
+        source=l_rfs_right,
+        target=l_output_right,
+        w=torch.ones(num_rfs_right, num_rfs_right),
+        update_rule=PostPre
+    )
+    c_teacherright_outputright = Connection(
+        source=l_teacher_right,
+        target=l_output_right,
+        w=torch.ones(num_rfs_right, num_rfs_right) * 5
+    )
+
+    c_rfsleft_outputleft = Connection(
+        source=l_rfs_left,
+        target=l_output_left,
+        w=torch.ones(num_rfs_left, num_rfs_left),
+        update_rule=PostPre
+    )
+    c_teacherleft_outputleft = Connection(
+        source=l_teacher_left,
+        target=l_output_left,
+        w=torch.ones(num_rfs_left, num_rfs_left) * 5
+    )
+
+    network_classify.add_connection(c_rfsright_outputright, source='rfs_right', target='output_right')
+    network_classify.add_connection(c_teacherright_outputright, source='teacher_right', target='output_right')
+    network_classify.add_connection(c_rfsleft_outputleft, source='rfs_left', target='output_left')
+    network_classify.add_connection(c_teacherleft_outputleft, source='teacher_left', target='output_left')
+
+    # Add teacher monitors
+    mon_teacher_right = Monitor(
+        obj=l_teacher_right,
+        state_vars=('s')
+    )
+    mon_teacher_left = Monitor(
+        obj=l_teacher_left,
+        state_vars=('s')
+    )
+
+    monitors['teacher_right'] = mon_teacher_right
+    monitors['teacher_left'] = mon_teacher_left
+    network_classify.add_monitor(monitor=mon_teacher_right, name='teacher_right')
+    network_classify.add_monitor(monitor=mon_teacher_left, name='teacher_left')
+
+    # Add output monitors
+    mon_output_right = Monitor(
+        obj=l_output_right,
+        state_vars=('s')
+    )
+    mon_output_left = Monitor(
+        obj=l_output_left,
+        state_vars=('s')
+    )
+
+    monitors['output_right'] = mon_output_right
+    monitors['output_left'] = mon_output_left
+    network_classify.add_monitor(monitor=mon_output_right, name='output_right')
+    network_classify.add_monitor(monitor=mon_output_left, name='output_left')
+
     return network_extract, network_classify, monitors
+
+def get_teacher_inputs(num_outputs_per_side, azimuth_num, dt, max_t, spike_freq=3e3):
+    # spike_freq is Hz of teacher signal
+    # Put high frequency linear spike train in location for the angle
+    # [ l0, l1, l2, middle, r0, r1, r2 ] <- azimuth_num indexes into this
+    # num_outputs_per_side is maximum azimuth_num/2, for this would be 4   <-- this might be wrong
+    #
+    # Frequency ordering
+    # left side: [ 0, -this, -max ]
+    # right side: [ 0, +this, +max ]
+    #
+    #
+
+    assert(azimuth_num < (2 * num_outputs_per_side) - 1)
+    times = np.arange(0, max_t, dt)
+
+    # Generate teacher spike train
+    teacher_spikes = []
+    teacher_dt = 1/spike_freq
+    last_spike = 0
+    for t in times:
+        if t >= last_spike:
+            teacher_spikes.append(1)
+            last_spike += teacher_dt
+        else:
+            teacher_spikes.append(0)
+    teacher_spikes = torch.tensor(teacher_spikes).byte()
+
+    right_spikes = torch.zeros(len(times), num_outputs_per_side).byte()
+    left_spikes = torch.zeros(len(times), num_outputs_per_side).byte()
+
+    if azimuth_num < num_outputs_per_side-1:
+        left_spikes[:, azimuth_num + 1] = teacher_spikes
+    elif azimuth_num == num_outputs_per_side-1:
+        left_spikes[:, 0] = teacher_spikes
+        right_spikes[:, 0] = teacher_spikes
+    else:
+        right_spikes[:, azimuth_num - num_outputs_per_side + 1] = teacher_spikes
+
+    return left_spikes, right_spikes
+
+
+
+
+    
+
 
 
 
