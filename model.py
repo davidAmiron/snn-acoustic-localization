@@ -1,188 +1,87 @@
 import torch
 import matplotlib.pyplot as plt
-from bindsnet.network import Network
-from bindsnet.network.nodes import Input, LIFNodes, IFNodes
-from bindsnet.network.topology import Connection
-from bindsnet.network.monitors import Monitor
 from bindsnet.analysis.plotting import plot_spikes, plot_voltages
 
 from utils import *
 
-###
-## General Setup
-###
+# Load data
+train_data = np.load('spike_data.npy', allow_pickle=True)
 
-time_ms = 150   # ms
-time_s = time_ms / 1e3    # max time in seconds
-fs = 100e3 # Hz
-dt = (1/fs)*1e3    # ms
-timesteps = int(time_ms/dt)
-network_extract = Network(dt=dt)
-print('Network timesteps: {}'.format(timesteps))
+# Network parameters
+extract_time_ms = 100
+extract_time_s = extract_time_ms * 1e-3
 
-###
-## Layers
-###
+classify_time_ms = 50
+classify_freq = 10e3  # Hz
+classify_dt_s = 1 / classify_freq
+classify_dt_ms = classify_dt_s * 1e3
+classify_time_s = classify_time_ms * 1e-3
 
-###
-## Input
-###
-signal_raw = get_audio_data(fs=fs, max_t=time_s)
-signal_left, signal_right = signal_HRTF_transform(signal_raw, 24, 1)
-signal_left_spikes = cochlear_model(signal_left, fs, time_s)
-signal_right_spikes = cochlear_model(signal_right, fs, time_s)
+num_rfs_right = 6
+rfs_freqs_right = [5, 10, 15, 20, 25, 30]
+rfs_widths_right = [10, 10, 10, 10, 10, 10]
 
-print('Raw lengths: {}'.format(signal_raw.shape[0]))
-print('HRTF lengths: left={}, right={}'.format(signal_left.shape[0], signal_right.shape[0]))
-print('Spike lengths: left={}, right={}'.format(signal_left_spikes.shape[0], signal_right_spikes.shape[0]))
-#assert(False)
+num_rfs_left = 6
+rfs_freqs_left = [5, 10, 15, 20, 25, 30]
+rfs_widths_left = [2, 2, 2, 2, 2, 2]
 
-###
-## Cochlear model
-###
-l_cochlea_left = Input(n=1, traces=True) # Input for now for testing
-l_cochlea_right = Input(n=1, traces=True) # Input for now for testing
-network_extract.add_layer(layer=l_cochlea_left, name='cochlea_left')
-network_extract.add_layer(layer=l_cochlea_right, name='cochlea_right')
+# Get models
+network_extract, network_classify, monitors = get_models(extract_time_ms, classify_time_ms,
+                                                         classify_dt_ms, num_rfs_right, num_rfs_left)
 
-# Temorary dummy input data for cochlea
-#input_data_cleft = torch.bernoulli(0.9 * torch.ones(timesteps, 1)).byte()
-input_data_cright = torch.bernoulli(0.3 * torch.ones(timesteps, 1)).byte()
-#inputs = { 'cochlea_left': input_data_cleft, 'cochlea_right': input_data_cright }
+# Train
+for datapoint in train_data:
 
-# Get temporary test data from spikes from tone made for testing
-#in_data = torch.tensor(cochlear_model(*get_audio_data())).byte().unsqueeze(1)
-input_data_left = torch.tensor(signal_left_spikes).byte().unsqueeze(1)
-input_data_right = torch.tensor(signal_right_spikes).byte().unsqueeze(1)
-inputs = { 'cochlea_left': input_data_left, 'cochlea_right': input_data_right }
-print('sum: {}'.format(torch.sum(input_data_left)))
-print('bernoulli sum: {}'.format(torch.sum(input_data_cright)))
-print('shape: {}'.format(input_data_left.shape))
-print('bernoulli shape: {}'.format(input_data_cright.shape))
-#assert(False)
+    # Get data values
+    freq = datapoint['freq']
+    azimuth = datapoint['azimuth']
+    elevation = datapoint['elevation']
+    left_spikes = datapoint['left_spikes']
+    right_spikes = datapoint['right_spikes']
 
-"""print(signal_raw.shape)
-print(signal_left.shape)
-print(signal_left_spikes.shape)
+    # Construct input for extraction network 
+    inputs = { 'cochlea_left': left_spikes, 'cochlea_right': right_spikes }
 
-plt.ioff()
-fig, axs = plt.subplots(2, 1)
-axs[0].plot(input_data_left, '.')
-axs[0].set_title('input_data_left')
-axs[1].plot(input_data_right, '.')
-axs[1].set_title('input_data_right')
-plt.show()
-assert(False)
-"""
+    # Run extraction network
+    network_extract.run(inputs=inputs, time=extract_time_ms)
 
-###
-## LSO
-###
+    # Get spikes, voltages, and spike frequencies
+    spikes = { 
+               'cochlea_left': monitors['cochlea_left'].get('s'),
+               'cochlea_right': monitors['cochlea_right'].get('s'),
+               'lso_left': monitors['lso_left'].get('s'),
+               'lso_right': monitors['lso_right'].get('s')
+             }
+    voltages = { 
+                 'lso_left': monitors['lso_left'].get('v'),
+                 'lso_right': monitors['lso_right'].get('v')
+               }
 
-# Two LIF neurons with excitatory synapse from ipsilateral cochlear model,
-# and one synapse from the contralateral cochlear model
-#l_lso_left = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=True)
-#l_lso_right = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=True)
-l_lso_left = LIFNodes(n=1, traces=True)
-l_lso_right = LIFNodes(n=1, traces=True)
-network_extract.add_layer(layer=l_lso_left, name='lso_left')
-network_extract.add_layer(layer=l_lso_right, name='lso_right')
+    left_spikes_freq = (torch.sum(spikes['lso_left']).item() / extract_time_s)
+    right_spikes_freq = (torch.sum(spikes['lso_right']).item() / extract_time_s)
+    print('left spikes frequency: {} Hz'.format(left_spikes_freq))
+    print('right spikes frequency: {} Hz'.format(right_spikes_freq))
 
-c_cleft_lsoleft = Connection(
-    source=l_cochlea_left,
-    target=l_lso_left,
-    w=torch.tensor([[5.0]]),
-    wmin=0
-)
+    # Construct inputs for classification network
+    rfs_inputs_right = get_rf_node_inputs(rfs_freqs_right, rfs_widths_right,
+                                              classify_dt_s, classify_time_s, right_spikes_freq)
+    rfs_inputs_left = get_rf_node_inputs(rfs_freqs_left, rfs_widths_left,
+                                              classify_dt_s, classify_time_s, left_spikes_freq)
+    # Run classification network
+    rfs_inputs = { 'rfs_right': rfs_inputs_right, 'rfs_left': rfs_inputs_left }
+    network_classify.run(inputs=rfs_inputs, time=classify_time_ms)
 
-c_cright_lsoleft = Connection(
-    source=l_cochlea_right,
-    target=l_lso_left,
-    w=torch.tensor([[-0.5]]),
-    wmax=0
-)
+    # Get rfs spikes
+    spikes_rfs = {
+                   'rfs_right': monitors['rfs_right'].get('s'),
+                   'rfs_left': monitors['rfs_left'].get('s')
+                 }
 
-c_cleft_lsoright = Connection(
-    source=l_cochlea_left,
-    target=l_lso_right,
-    w=torch.tensor([[-0.5]]),
-    wmax=0
-)
-
-c_cright_lsoright = Connection(
-    source=l_cochlea_right,
-    target=l_lso_right,
-    w=torch.tensor([[5.0]]),
-    wmin=0
-)
-
-network_extract.add_connection(c_cleft_lsoleft, source='cochlea_left', target='lso_left')
-network_extract.add_connection(c_cright_lsoleft, source='cochlea_right', target='lso_left')
-network_extract.add_connection(c_cleft_lsoright, source='cochlea_left', target='lso_right')
-network_extract.add_connection(c_cright_lsoright, source='cochlea_right', target='lso_right')
+    plt.ioff()
+    plot_spikes(spikes)
+    plot_voltages(voltages)
+    plot_spikes(spikes_rfs)
+    plt.show()
 
 
-mon_lso_left = Monitor(
-    obj=l_lso_left,
-    state_vars=('s', 'v')
-#    time=time_ms
-)
-mon_lso_right = Monitor(
-    obj=l_lso_right,
-    state_vars=('s', 'v')
-#    time=time_ms
-)
-mon_cochlea_left = Monitor(
-    obj=l_cochlea_left,
-    state_vars=('s')
-#    time=time_ms
-)
-mon_cochlea_right = Monitor(
-    obj=l_cochlea_right,
-    state_vars=('s')
-#    time=time_ms
-)
-"""mon_misc = Monitor(
-    obj=l_cochlea_left,
-    state_vars=('s'),
-    time=time_ms
-)"""
 
-network_extract.add_monitor(monitor=mon_lso_left, name='lso_left')
-network_extract.add_monitor(monitor=mon_lso_right, name='lso_right')
-network_extract.add_monitor(monitor=mon_cochlea_left, name='cochlea_left')
-network_extract.add_monitor(monitor=mon_cochlea_right, name='cochlea_right')
-#network_extract.add_monitor(monitor=mon_misc, name='cochlea_left')
-
-###
-## Run Extraction Network
-###
-
-network_extract.run(inputs=inputs, time=time_ms)
-spikes = { 'cochlea_left': mon_cochlea_left.get('s'), 'cochlea_right': mon_cochlea_right.get('s'),
-           'lso_left': mon_lso_left.get('s'), 'lso_right': mon_lso_right.get('s') }
-voltages = { 'lso_left': mon_lso_left.get('v'), 'lso_right': mon_lso_right.get('v') }
-
-left_spikes_freq = (torch.sum(spikes['lso_left']).item() / time_s)
-right_spikes_freq = (torch.sum(spikes['lso_right']).item() / time_s)
-print('left spikes frequency: {} Hz'.format(left_spikes_freq))
-print('right spikes frequency: {} Hz'.format(right_spikes_freq))
-
-###
-## Receptive Fields
-###
-#l_rfs = RFNodes(torch.ones(3), torch.ones(3), n=3)
-#network.add_layer(layer=l_rfs, name='rfs')
-#
-#c_rfs = Connection(
-#    source=l_lso_left,
-#    target=l_rfs,
-#    w=torch.ones(l_lso_left.n, l_rfs.n)
-#)
-#network.add_connection(c_rfs, source='lso_left', target='rfs')
-
-
-plt.ioff()
-plot_spikes(spikes)
-plot_voltages(voltages)
-plt.show()
