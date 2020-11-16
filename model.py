@@ -1,3 +1,4 @@
+import sys
 import torch
 import matplotlib.pyplot as plt
 from bindsnet.analysis.plotting import plot_spikes, plot_voltages
@@ -5,11 +6,16 @@ from test_data import azimuths, azimuth_idxs
 
 from utils import *
 
+if len(sys.argv) < 2:
+    print("Usage: python model.py [spike data file]")
+    sys.exit(1)
+
 # Load data
-train_data = np.load('spike_data.npy', allow_pickle=True)
+spike_file = sys.argv[1]
+train_data = np.load(spike_file, allow_pickle=True)
 
 # Network parameters
-extract_time_ms = 100
+from test_data import extract_time_ms
 extract_time_s = extract_time_ms * 1e-3
 
 classify_time_ms = 50
@@ -22,11 +28,13 @@ classify_time_s = classify_time_ms * 1e-3
 # there is an odd number, the same amount on either side and zero
 num_azimuths = len(azimuths)
 num_rfs_right = (num_azimuths+1)//2
-rfs_freqs_right = np.linspace(20, 40, num_rfs_right)
+#rfs_freqs_right = np.linspace(20, 40, num_rfs_right)
+rfs_freqs_right = [ 14, 16 ]
 rfs_widths_right = np.ones(num_rfs_right) * 2
 
 num_rfs_left = (num_azimuths+1)//2
 rfs_freqs_left = np.linspace(20, 40, num_rfs_left)
+rfs_freqs_right = [ 14, 16 ]
 rfs_widths_left = np.ones(num_rfs_left) * 2        
 
 # Get models
@@ -96,6 +104,9 @@ for datapoint in train_data:
     plot_voltages(voltages)
     plot_spikes(spikes_classify)
     plt.show()
+
+    network_extract.reset_state_variables()
+    network_classify.reset_state_variables()
 
 
 

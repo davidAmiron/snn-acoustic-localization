@@ -48,7 +48,7 @@ class RFNodes(Nodes):
         super().__init__(
             n=n,
             shape=shape,
-            traces=True,
+            traces=traces,
             traces_additive=traces_additive,
             tc_trace=tc_trace,
             trace_scale=trace_scale,
@@ -217,7 +217,7 @@ def cochlear_model(signal_raw, fs, max_t):
     s_dt = v_dt
     s_noiseType = float(1)
     s_implnt = float(1)
-    s_spont = float(50)
+    s_spont = float(10)
     s_tabs = float(0.007e-3)
     s_trel = float(0.006e-3)
 
@@ -233,7 +233,7 @@ def cochlear_model(signal_raw, fs, max_t):
     # For now just return one spike data while I get the rest of the network running
     return loadmat('spike_data/psth3.mat')['psth'][0]"""
 
-def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right, num_rfs_left):
+def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right, num_rfs_left, traces=True):
 
     ###
     ## General Setup
@@ -250,8 +250,8 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     ###
     ## Cochlear model
     ###
-    l_cochlea_left = Input(n=1, traces=True)
-    l_cochlea_right = Input(n=1, traces=True)
+    l_cochlea_left = Input(n=1, traces=traces)
+    l_cochlea_right = Input(n=1, traces=traces)
     network_extract.add_layer(layer=l_cochlea_left, name='cochlea_left')
     network_extract.add_layer(layer=l_cochlea_right, name='cochlea_right')
 
@@ -275,10 +275,10 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
 
     # Two LIF neurons with excitatory synapse from ipsilateral cochlear model,
     # and one synapse from the contralateral cochlear model
-    #l_lso_left = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=True)
-    #l_lso_right = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=True)
-    l_lso_left = LIFNodes(n=1, traces=True)
-    l_lso_right = LIFNodes(n=1, traces=True)
+    #l_lso_left = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=traces)
+    #l_lso_right = LIFNodes(n=1, refrac=0.05, tc_delay=1, traces=traces)
+    l_lso_left = LIFNodes(n=1, traces=traces)
+    l_lso_right = LIFNodes(n=1, traces=traces)
     network_extract.add_layer(layer=l_lso_left, name='lso_left')
     network_extract.add_layer(layer=l_lso_right, name='lso_right')
 
@@ -292,14 +292,14 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     c_cright_lsoleft = Connection(
         source=l_cochlea_right,
         target=l_lso_left,
-        w=torch.tensor([[-1.0]]),
+        w=torch.tensor([[-0.5]]),
         wmax=0
     )
 
     c_cleft_lsoright = Connection(
         source=l_cochlea_left,
         target=l_lso_right,
-        w=torch.tensor([[-1.0]]),
+        w=torch.tensor([[-0.5]]),
         wmax=0
     )
 
@@ -360,7 +360,7 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     network_classify = Network(dt=classify_dt_ms)
 
     # Add right RFS nodes
-    l_rfs_right = Input(n=num_rfs_right, traces=True)
+    l_rfs_right = Input(n=num_rfs_right, traces=traces)
     network_classify.add_layer(layer=l_rfs_right, name='rfs_right')
 
     mon_rfs_right = Monitor(
@@ -371,7 +371,7 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     monitors['rfs_right'] = mon_rfs_right
 
     # Add left RFS Nodes
-    l_rfs_left = Input(n=num_rfs_left, traces=True)
+    l_rfs_left = Input(n=num_rfs_left, traces=traces)
     network_classify.add_layer(layer=l_rfs_left, name='rfs_left')
 
     mon_rfs_left = Monitor(
@@ -382,14 +382,14 @@ def get_models(extract_time_ms, classify_time_ms, classify_dt_ms, num_rfs_right,
     monitors['rfs_left'] = mon_rfs_left
 
     # Add teacher nodes
-    l_teacher_right = Input(n=num_rfs_right, traces=True)
-    l_teacher_left = Input(n=num_rfs_left, traces=True)
+    l_teacher_right = Input(n=num_rfs_right, traces=traces)
+    l_teacher_left = Input(n=num_rfs_left, traces=traces)
     network_classify.add_layer(layer=l_teacher_right, name='teacher_right')
     network_classify.add_layer(layer=l_teacher_left, name='teacher_left')
 
     # Add output nodes
-    l_output_right = LIFNodes(n=num_rfs_right, traces=True)
-    l_output_left = LIFNodes(n=num_rfs_left, traces=True)
+    l_output_right = LIFNodes(n=num_rfs_right, traces=traces)
+    l_output_left = LIFNodes(n=num_rfs_left, traces=traces)
     network_classify.add_layer(layer=l_output_right, name='output_right')
     network_classify.add_layer(layer=l_output_left, name='output_left')
 
